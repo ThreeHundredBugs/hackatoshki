@@ -14,9 +14,6 @@ boto3>=1.37.22
 # Kubernetes integration
 kubernetes>=32.0.1
 
-# Database
-clickhouse-driver>=0.2.9
-
 # GitHub integration
 PyGithub>=2.6.1
 
