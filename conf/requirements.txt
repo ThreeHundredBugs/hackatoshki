@@ -1,5 +1,12 @@
 # Core dependencies
+fastapi>=0.115.12
+uvicorn>=0.34.0
 pydantic>=2.11.0
+pydantic-settings>=2.8.1
+python-dotenv>=1.1.0
+httpx>=0.28.1
+structlog>=25.2.0
+respx==0.22.0
 
 # AWS integration
 boto3>=1.37.22
@@ -15,3 +22,11 @@ PyGithub>=2.6.1
 
 # Type checking
 mypy>=1.15.0
+
+# Development dependencies
+pytest==8.3.5
+pytest-asyncio==0.26.0
+pytest-cov==6.0.0
+isort==6.0.1
+mypy==1.15.0
+ruff==0.11.2
