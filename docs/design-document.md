@@ -11,6 +11,7 @@ Create a scalable service to process Opsgenie events via OEC integration, with e
 - Docker-based deployment
 - Easy handler registration system
 - Reusable services for external systems integration
+- Webhook server for Opsgenie event ingestion
 
 ## 2. System Architecture
 
@@ -21,11 +22,13 @@ Create a scalable service to process Opsgenie events via OEC integration, with e
    - OEC Integration
    - Configuration files
    - Environment management
+   - Webhook server
 
 2. **Core Service Layer**
    - Event Router: Responsible for routing incoming events to appropriate handlers
    - Handler Registry: Manages registration and discovery of event handlers
    - Configuration Manager: Handles service configuration and environment variables
+   - Webhook Server: Receives and validates Opsgenie events and route events by action to correct handler
 
 3. **Service Layer**
    - Kubernetes Service: Manages K8s cluster operations
@@ -63,7 +66,8 @@ src/
 │   ├── __init__.py
 │   ├── router.py          # Event routing logic
 │   ├── registry.py        # Handler registration
-│   └── config.py          # Configuration management
+│   ├── config.py          # Configuration management
+│   └── webhook.py         # Webhook server implementation
 ├── services/
 │   ├── __init__.py
 │   ├── base.py           # Base service interface
@@ -88,6 +92,9 @@ src/
 │   ├── base.py           # Base handler interface
 │   ├── alert_handler.py  # Alert event handler
 │   └── incident_handler.py # Incident event handler
+├── models/
+│   ├── __init__.py
+│   └── events.py         # Pydantic models for Opsgenie events
 ├── utils/
 │   ├── __init__.py
 │   └── exceptions.py     # Custom exceptions
@@ -117,6 +124,7 @@ src/
 2. Create handler registry with service injection
 3. Implement event router
 4. Set up configuration management
+5. Implement webhook server
 
 ### 3.4 Phase 4: Handler Implementation
 1. Implement initial handlers using services
@@ -135,14 +143,97 @@ src/
 services:
   app:
     build: .
+    ports:
+      - "8080:8080"
     volumes:
       - ./src:/app/src
+    environment:
+      - PORT=8080
+      - LOG_LEVEL=INFO
 ```
 
+## 5. Webhook Server Specification
 
-1. Set up initial project structure
-2. Create Docker environment
-3. Implement core components
-4. Add initial handlers
-5. Set up basic OEC integration
+### 5.1 Endpoints
 
+#### 5.1.1 Event Webhook
+- **URL**: `/api/v1/webhook`
+- **Method**: `POST`
+- **Headers**:
+  - `Content-Type: application/json`
+- **Rate Limiting**: 1000 requests per minute
+- **Authentication**: API key in header `X-Actions-Auth`
+
+### 5.2 Opsgenie Event Types
+
+The webhook server handles the following Opsgenie event types:
+
+1. **Alert Actions**
+   - Create
+   - Acknowledge/UnAcknowledge
+   - Add Note
+   - Add Tags/Remove Tags
+   - Close
+   - Delete
+   - Escalate
+   - Update Priority
+   - Update Description
+   - Update Message
+   - Assign Ownership
+   - Take Ownership
+   - Custom Actions
+
+### 5.3 Event Models
+
+All events follow this base structure:
+```python
+{
+    "action": str,           # The type of action performed
+    "integrationId": str,    # Opsgenie integration ID
+    "integrationName": str,  # Integration name
+    "source": {
+        "name": str,
+        "type": str
+    },
+    "alert": {
+        "alertId": str,
+        "message": str,
+        "tags": list[str],
+        "tinyId": str,
+        "alias": str,
+        "createdAt": int,
+        "updatedAt": int,
+        "username": str,
+        "userId": str,
+        "entity": str
+        # Additional fields based on action type
+    }
+}
+```
+
+### 5.4 Error Handling
+
+The webhook server implements the following error responses:
+
+- 400 Bad Request: Invalid event payload
+- 401 Unauthorized: Invalid or missing API key
+- 403 Forbidden: Rate limit exceeded
+- 422 Unprocessable Entity: Valid JSON but invalid event structure
+- 500 Internal Server Error: Server-side processing error
+
+### 5.5 Logging and Monitoring
+
+## 6. Security Considerations
+
+### 6.1 API Security
+- API key validation
+- Rate limiting per integration
+- Input validation and sanitization
+- Request size limits
+- TLS/SSL encryption
+
+### 6.2 Event Validation
+- JSON schema validation
+- Required field validation
+- Data type validation
+- Action type validation
