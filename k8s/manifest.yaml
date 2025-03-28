@@ -1,0 +1,187 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: default # Adjust namespace if needed
+data:
+  nginx.conf: |
+    events {}
+    http {
+      log_format detailed '$remote_addr - $remote_user [$time_local] '
+                         '"$request" $status $body_bytes_sent '
+                         '"$http_referer" "$http_user_agent" '
+                         '"$http_x_actions_auth" '
+                         '"body-start" "$request_body" "body-end"';
+      log_format postdata $request_body;
+
+      access_log /dev/stdout detailed;
+      error_log /dev/stdout;
+
+      server {
+        listen 80;
+        server_name localhost;
+
+        location / {
+          access_log /dev/stdout postdata;
+          return 200 "Request received and logged\n";
+        }
+      }
+    }
+
+  server.py: |
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    
+    class RequestHandler(BaseHTTPRequestHandler):
+        def log_request(self, code='-', size='-'):
+            # Log the full request details
+            print(f"Method: {self.command}")
+            print(f"Path: {self.path}")
+            print(f"Headers:\n{self.headers}")
+        
+            content_length = self.headers.get('Content-Length')
+            if content_length:
+                body = self.rfile.read(int(content_length)).decode('utf-8')
+                print(f"Body:\n{body}")
+            else:
+                print("Body: <none>")
+      
+        def do_GET(self):
+            self.log_request()
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b"Request received and logged\n")
+        
+        def do_POST(self):
+            self.log_request()
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b"Request received and logged\n")
+        
+        def do_PUT(self):
+            self.log_request()
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b"Request received and logged\n")
+        
+        def do_DELETE(self):
+            self.log_request()
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b"Request received and logged\n")
+    
+    print("Starting server...")
+    if __name__ == '__main__':
+        print("Starting server 2...")
+        server = HTTPServer(('0.0.0.0', 80), RequestHandler)
+        print("Server running on port 80...")
+        server.serve_forever()
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opsgenie-actions
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opsgenie-actions
+  template:
+    metadata:
+      labels:
+        app: opsgenie-actions
+    spec:
+      containers:
+        - name: py
+          image: python:3.13-slim
+          ports:
+            - containerPort: 80
+          command:
+            - bash
+            - -c
+            - |
+              export PYTHONUNBUFFERED=1
+              python /f/server.py
+          resources:
+            requests:
+              memory: "100Mi"
+              cpu: "250m"
+          volumeMounts:
+            - name: config-volume
+              mountPath: /f
+
+#        - name: nginx
+#          image: nginx:latest
+#          ports:
+#            - containerPort: 80
+#          volumeMounts:
+#            - name: config-volume
+#              mountPath: /etc/nginx/nginx.conf
+#              subPath: nginx.conf
+      volumes:
+        - name: config-volume
+          configMap:
+            name: nginx-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opsgenie-actions
+  namespace: default
+spec:
+  selector:
+    app: opsgenie-actions
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: ClusterIP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: opsgenie-actions
+  namespace: default
+spec:
+  ingressClassName: nginx-stable
+  tls:
+    - hosts:
+        - opsgenie-actions.ops.improvado.io
+      secretName: opsgenie-actions-tls
+  rules:
+    - host: opsgenie-actions.ops.improvado.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: opsgenie-actions
+                port:
+                  number: 8000
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  annotations:
+    legalzoom.com/import-to-acm: "true"
+  labels:
+    use-solver: dns01
+  name: opsgenie-actions.ops.improvado.io
+  namespace: default
+spec:
+  dnsNames:
+    - opsgenie-actions.ops.improvado.io
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod
+  secretName: opsgenie-actions-tls
