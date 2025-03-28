@@ -124,9 +124,8 @@ src/
 3. Document handler creation process
 
 ### 3.5 Phase 5: Infrastructure
-1. Set up OEC in Docker
-2. Configure networking
-3. Create deployment scripts
+1. Configure networking
+2. Create deployment scripts
 
 ## 4. Docker Configuration
 
@@ -134,20 +133,10 @@ src/
 ```yaml
 # docker-compose.yml structure
 services:
-  oec:
-    build: ./docker/oec
-    volumes:
-      - ./conf:/etc/opsgenie/conf
-      - ./scripts:/opt/oec/scripts
-    environment:
-      - OPSGENIE_API_KEY=${OPSGENIE_API_KEY}
-
   app:
     build: .
     volumes:
       - ./src:/app/src
-    depends_on:
-      - oec
 ```
 
 
@@ -157,22 +146,3 @@ services:
 4. Add initial handlers
 5. Set up basic OEC integration
 
-## 5. OEC Integration Details
-
-### 5.1 OEC Configuration
-The OEC configuration will be stored in `/etc/opsgenie/conf/config.json`:
-
-```json
-{
-  "apiKey": "${OPSGENIE_API_KEY}",
-  "logLevel": "info",
-  "actions": [
-    {
-      "name": "process_alert",
-      "script": "/opt/oec/scripts/alert_handler.py",
-      "executor": "python3",
-      "workingDirectory": "/opt/oec/scripts"
-    }
-  ]
-}
-```
