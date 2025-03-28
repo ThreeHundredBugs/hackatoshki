@@ -3,16 +3,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import structlog
 
-from src.core.config import settings
-from src.handlers.stub_handler import StubHandler
-from src.models.events import OpsgenieEvent
+from core.config import settings
+from handlers.stub_handler import StubHandler
+from models.events import OpsgenieEvent
+from handlers.github_changes_handler import GitHubChangesHandler
+from services.opsgenie.service import OpsgenieService
+
 
 # Configure structured logging
 logger = structlog.get_logger()
 
 app = FastAPI(
-    title="OEC Event Processor",
-    description="Service to process Opsgenie events via OEC integration",
+    title="Event Processor",
+    description="Service to process Opsgenie events via integration",
     version="0.1.0",
 )
 
@@ -24,8 +27,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize handlers
+# Initialize handlers and services
 stub_handler = StubHandler()
+github_changes_handler = GitHubChangesHandler()
+opsgenie_service = OpsgenieService(api_key=settings.opsgenie_api_key)
 
 
 def verify_api_key(x_actions_auth: str = Header(None)) -> None:
@@ -64,6 +69,20 @@ async def webhook(
     try:
         # For now, use the stub handler for all events
         result = await stub_handler.handle(event)
+        
+        # Add a note to the alert with the processing result
+        note = f"Event processed by {result['handler']} handler with status: {result['status']}"
+        if result.get('error'):
+            note += f"\nError: {result['error']}"
+        
+        note_result = await opsgenie_service.add_note(
+            alert_id=event.alert.alert_id,
+            note=note,
+        )
+        
+        # Include note result in the response
+        result['note_result'] = note_result
+        
         return JSONResponse(content=result)
         
     except Exception as e:

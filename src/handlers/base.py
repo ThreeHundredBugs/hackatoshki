@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from src.models.events import OpsgenieEvent
+from models.events import OpsgenieEvent
 
 
 class BaseHandler(ABC):

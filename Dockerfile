@@ -10,7 +10,9 @@ COPY conf/requirements.txt conf/requirements.txt
 RUN pip install --no-cache-dir -r conf/requirements.txt
 
 # Copy application code
-COPY src/ src/
+COPY . .
+
+WORKDIR /app/src
 
 # Run the application
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8080"] 
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"] 

@@ -2,8 +2,8 @@ from typing import Any
 
 import structlog
 
-from src.handlers.base import BaseHandler
-from src.models.events import OpsgenieEvent
+from handlers.base import BaseHandler
+from models.events import OpsgenieEvent
 
 logger = structlog.get_logger()
 

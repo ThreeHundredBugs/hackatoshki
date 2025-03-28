@@ -8,11 +8,18 @@ class Settings(BaseSettings):
     api_key: str = "default-key"  # Should be overridden in production
     rate_limit: int = 1000  # Requests per minute
     
+    # GitHub settings
+    github_token: str | None = None
+    github_org: str = "tekliner"
+    
     # Logging
     log_level: str = "INFO"
     
     # Environment
     environment: str = "development"
+    
+    # Opsgenie API key for alert management
+    opsgenie_api_key: str = "opsgenie-api-key"
     
     model_config = SettingsConfigDict(
         env_file=".env",
